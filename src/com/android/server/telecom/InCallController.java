@@ -46,6 +46,7 @@ import android.os.RemoteException;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.provider.Settings;
 import android.telecom.CallAudioState;
@@ -89,11 +90,10 @@ public class InCallController extends CallsManagerListenerBase implements
     public static final String NOTIFICATION_TAG = InCallController.class.getSimpleName();
     public static final int IN_CALL_SERVICE_NOTIFICATION_ID = 3;
 
-    private static final long[] INCALL_VIBRATION_PATTERN = {
-            100,
-            200,
-            0,
-    };
+    private static final VibrationEffect CALL_CONNECT_EFFECT =
+        VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK);
+    private static final VibrationEffect CALL_DISCONNECT_EFFECT =
+        VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK);
 
     public class InCallServiceConnection {
         /**
@@ -1047,6 +1047,8 @@ public class InCallController extends CallsManagerListenerBase implements
     private ArraySet<String> mAllCarrierPrivilegedApps = new ArraySet<>();
     private ArraySet<String> mActiveCarrierPrivilegedApps = new ArraySet<>();
 
+    private final Vibrator mVibrator;
+
     public InCallController(Context context, TelecomSystem.SyncRoot lock, CallsManager callsManager,
             SystemStateHelper systemStateHelper, DefaultDialerCache defaultDialerCache,
             Timeouts.Adapter timeoutsAdapter, EmergencyCallHelper emergencyCallHelper,
@@ -1054,6 +1056,7 @@ public class InCallController extends CallsManagerListenerBase implements
         mContext = context;
         mAppOpsManager = context.getSystemService(AppOpsManager.class);
         mSensorPrivacyManager = context.getSystemService(SensorPrivacyManager.class);
+        mVibrator = context.getSystemService(Vibrator.class);
         mLock = lock;
         mCallsManager = callsManager;
         mSystemStateHelper = systemStateHelper;
@@ -1304,16 +1307,14 @@ public class InCallController extends CallsManagerListenerBase implements
     @Override
     public void onCallStateChanged(Call call, int oldState, int newState) {
         maybeTrackMicrophoneUse(isMuted());
-        boolean vibrateOnConnect = Settings.System.getIntForUser(mContext.getContentResolver(),
-            Settings.System.INCALL_FEEDBACK_VIBRATE, 0, UserHandle.USER_CURRENT) == 1;
-        boolean vibrateOnDisconnect = Settings.System.getIntForUser(mContext.getContentResolver(),
-            Settings.System.INCALL_FEEDBACK_VIBRATE, 0, UserHandle.USER_CURRENT) == 1;
-
-        if (oldState == CallState.DIALING && newState == CallState.ACTIVE && vibrateOnConnect) {
-            vibrate(INCALL_VIBRATION_PATTERN);
-        } else if (oldState == CallState.ACTIVE && newState == CallState.DISCONNECTED
-                && vibrateOnDisconnect) {
-            vibrate(INCALL_VIBRATION_PATTERN);
+        final boolean vibrate = Settings.System.getIntForUser(
+            mContext.getContentResolver(),
+            Settings.System.INCALL_FEEDBACK_VIBRATE,
+            0, UserHandle.USER_CURRENT) == 1;
+        if (oldState == CallState.DIALING && newState == CallState.ACTIVE && vibrate) {
+            vibrate(CALL_CONNECT_EFFECT);
+        } else if (oldState == CallState.ACTIVE && newState == CallState.DISCONNECTED && vibrate) {
+            vibrate(CALL_DISCONNECT_EFFECT);
         }
         updateCall(call);
     }
@@ -2389,7 +2390,9 @@ public class InCallController extends CallsManagerListenerBase implements
         call.maybeOnInCallServiceTrackingChanged(isAdd, hasUi);
     }
 
-    public void vibrate(long[] pattern) {
-        ((Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE)).vibrate(pattern, -1);
+    public void vibrate(VibrationEffect effect) {
+        if (mVibrator.hasVibrator()) {
+            mVibrator.vibrate(effect);
+        }
     }
 }
