@@ -344,7 +344,6 @@ public class CallsManager extends Call.ListenerBase
     private final CallAudioManager mCallAudioManager;
     private final CallRecordingTonePlayer mCallRecordingTonePlayer;
     private RespondViaSmsManager mRespondViaSmsManager;
-    private final Ringer mRinger;
     private final InCallWakeLockController mInCallWakeLockController;
     // For this set initial table size to 16 because we add 13 listeners in
     // the CallsManager constructor.
@@ -570,7 +569,7 @@ public class CallsManager extends Call.ListenerBase
                 emergencyCallHelper);
         mCallDiagnosticServiceController = callDiagnosticServiceController;
         mCallDiagnosticServiceController.setInCallTonePlayerFactory(playerFactory);
-        mRinger = new Ringer(playerFactory, context, systemSettingsUtil, asyncRingtonePlayer,
+        final Ringer ringer = new Ringer(playerFactory, context, systemSettingsUtil, asyncRingtonePlayer,
                 ringtoneFactory, systemVibrator,
                 new Ringer.VibrationEffectProxy(), mInCallController);
         mCallRecordingTonePlayer = new CallRecordingTonePlayer(mContext, audioManager,
@@ -578,7 +577,7 @@ public class CallsManager extends Call.ListenerBase
         mCallAudioManager = new CallAudioManager(callAudioRouteStateMachine,
                 this, callAudioModeStateMachineFactory.create(systemStateHelper,
                 (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE)),
-                playerFactory, mRinger, new RingbackPlayer(playerFactory),
+                playerFactory, ringer, new RingbackPlayer(playerFactory),
                 bluetoothStateReceiver, mDtmfLocalTonePlayer);
 
         mConnectionSvrFocusMgr = connectionServiceFocusManagerFactory.create(mRequester);
@@ -3904,10 +3903,6 @@ public class CallsManager extends Call.ListenerBase
             // ensure that the tone generator stops playing the tone.
             if (newState == CallState.ON_HOLD && call.isDtmfTonePlaying()) {
                 stopDtmfTone(call);
-            }
-            // Maybe start a vibration for MO call.
-            if (newState == CallState.ACTIVE && !call.isIncoming() && !call.isUnknown()) {
-                mRinger.startVibratingForOutgoingCallActive();
             }
 
             // Unfortunately, in the telephony world the radio is king. So if the call notifies

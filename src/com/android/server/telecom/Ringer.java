@@ -695,11 +695,10 @@ public class Ringer {
 
         stopRinging();
 
-       if (Settings.System.getIntForUser(mContext.getContentResolver(),
-                Settings.System.INCALL_FEEDBACK_VIBRATE, 0, UserHandle.USER_CURRENT) == 1) {
-            if (mVibrator.hasVibrator()) {
-                mVibrator.vibrate(CALL_WAITING_VIBRATION_PATTERN, -1);
-            }
+        final boolean vibrateOnWaiting = Settings.System.getIntForUser(mContext.getContentResolver(),
+                Settings.System.INCALL_FEEDBACK_VIBRATE, 0, UserHandle.USER_CURRENT) == 1;
+        if (vibrateOnWaiting && mVibrator.hasVibrator()) {
+            mVibrator.vibrate(CALL_WAITING_VIBRATION_PATTERN, -1);
         }
 
         if (mCallWaitingPlayer == null) {
@@ -841,27 +840,6 @@ public class Ringer {
         }
         return mSystemSettingsUtil.canVibrateWhenRinging(context)
             || mSystemSettingsUtil.applyRampingRinger(context);
-    }
-
-    public void startVibratingForOutgoingCallActive() {
-        if (!mIsVibrating
-                && Settings.Global.getInt(mContext.getContentResolver(),
-                        Settings.Global.VIBRATING_FOR_OUTGOING_CALL_ACCEPTED, 1) == 1) {
-            mIsVibrating = true;
-            java.util.concurrent.Executors.defaultThreadFactory().newThread(() -> {
-                final VibrationEffect vibrationEffect =
-                        mVibrationEffectProxy.createWaveform(SIMPLE_VIBRATION_PATTERN,
-                        SIMPLE_VIBRATION_AMPLITUDE, REPEAT_SIMPLE_VIBRATION_AT);
-                final AudioAttributes vibrationAttributes = new AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                        .build();
-                mVibrator.vibrate(vibrationEffect, vibrationAttributes);
-                android.os.SystemClock.sleep(OUTGOING_CALL_VIBRATING_DURATION);
-                mVibrator.cancel();
-                mIsVibrating = false;
-            }).start();
-        }
     }
 
     private RingerAttributes getRingerAttributes(Call call, boolean isHfpDeviceAttached) {
